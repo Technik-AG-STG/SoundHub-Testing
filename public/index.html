@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Instagram Clone</title>
+    <style>
+        /* Add your CSS styles here */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #fafafa;
+        }
+
+        header {
+            background-color: #fff;
+            padding: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        header h1 {
+            margin: 0;
+        }
+
+        header button {
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-size: 16px;
+            color: #007bff;
+        }
+
+        main {
+            max-width: 600px;
+            margin: 20px auto;
+        }
+
+        .login-container,
+        .posts-container {
+            display: none;
+        }
+
+        .login-form,
+        .post {
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 10px;
+            margin-bottom: 20px;
+        }
+
+        .post img {
+            width: 100%;
+            height: auto;
+        }
+
+        .post-actions {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+
+        .like-count,
+        .comment-button {
+            cursor: pointer;
+            color: #007bff;
+            text-decoration: underline;
+        }
+
+        .comments-window {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            padding: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 100%;
+            box-sizing: border-box;
+            z-index: 2;
+        }
+
+        /* Add more styles as needed */
+    </style>
+</head>
+<body>
+    <header>
+        <!-- Add your header content here -->
+        <h1>Instagram Clone</h1>
+        <button id="logout-btn">Logout</button>
+    </header>
+
+    <main>
+        <div class="login-container">
+            <div class="login-form">
+                <label for="username">Username:</label>
+                <input type="text" id="username" required>
+                <label for="password">Password:</label>
+                <input type="password" id="password" required>
+                <button id="login-btn">Login</button>
+            </div>
+        </div>
+
+        <div class="posts-container">
+            <!-- Add your main content here -->
+            <div id="posts-container">
+                <!-- Sample post -->
+                <div class="post" data-post-id="1">
+                    <img src="sample-image.jpg" alt="Sample Image">
+                    <p>Post caption goes here</p>
+                    <div class="post-actions">
+                        <button class="like-button">Like</button>
+                        <span class="like-count">0 Likes</span>
+                        <button class="comment-button">Comments</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form to add new posts -->
+            <form id="add-post-form">
+                <label for="image-url">Image URL:</label>
+                <input type="text" id="image-url" required>
+                <label for="caption">Caption:</label>
+                <textarea id="caption" required></textarea>
+                <button type="submit">Add Post</button>
+            </form>
+
+            <!-- Comments window -->
+            <div class="comments-window" id="comments-window">
+                <h2>Comments</h2>
+                <div class="comments-list" id="comments-list"></div>
+                <input type="text" id="new-comment" placeholder="Add a comment...">
+                <button id="add-comment-btn">Add Comment</button>
+                <button id="close-comments-btn">Close</button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Add your JavaScript code here
+        document.addEventListener('DOMContentLoaded', async function () {
+            const loginContainer = document.querySelector('.login-container');
+            const postsContainer = document.querySelector('.posts-container');
+            const loginForm = document.querySelector('.login-form');
+            const loginButton = document.getElementById('login-btn');
+            const logoutButton = document.getElementById('logout-btn');
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+            const likeButtons = document.querySelectorAll('.like-button');
+            const commentButtons = document.querySelectorAll('.comment-button');
+            const likeCounts = document.querySelectorAll('.like-count');
+            const commentsWindow = document.getElementById('comments-window');
+            const commentsList = document.getElementById('comments-list');
+            const newCommentInput = document.getElementById('new-comment');
+            const addCommentBtn = document.getElementById('add-comment-btn');
+            const closeCommentsBtn = document.getElementById('close-comments-btn');
+
+            let users;
+            let currentUser = null;
+            let likedPosts = new Set();
+            let currentPostId = null;
+
+            try {
+                const response = await fetch('users.json');
+                users = await response.json();
+            } catch (error) {
+                console.error('Error fetching users:', error);
+                return;
+            }
+
+            
+
+            commentButtons.forEach((button, index) => {
+                button.addEventListener('click', async function () {
+                    currentPostId = button.closest('.post').getAttribute('data-post-id');
+                    showCommentsWindow();
+                    await loadComments();
+                });
+            });
+
+            addCommentBtn.addEventListener('click', async function () {
+                const commentText = newCommentInput.value.trim();
+                if (commentText) {
+                    await addComment(commentText);
+                    newCommentInput.value = '';
+                } else {
+                    alert('Please enter a comment.');
+                }
+            });
+
+            async function loadComments() {
+            try {
+                const response = await fetch(`/comments/${currentPostId}`);
+                const { comments } = await response.json();
+
+                commentsList.innerHTML = '';
+
+                comments.forEach(comment => {
+                    const commentElement = createCommentElement(comment);
+                    commentsList.appendChild(commentElement);
+                });
+            } catch (error) {
+                console.error('Error fetching comments:', error);
+            }
+        }
+
+        async function addComment(text) {
+            try {
+                const response = await fetch(`/comments/${currentPostId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text, username: currentUser }),
+                });
+
+                const { success } = await response.json();
+
+                if (success) {
+                    // Refresh comments after adding a new comment
+                    await loadComments();
+                } else {
+                    console.error('Error adding comment');
+                }
+            } catch (error) {
+                console.error('Error adding comment:', error);
+            }
+        }
+
+        function createCommentElement(comment) {
+    const commentElement = document.createElement('div');
+    commentElement.classList.add('comment');
+    
+    // Ensure the comment object has the necessary properties
+    if (comment && comment.username && comment.text) {
+        commentElement.innerHTML = `${comment.username}: ${comment.text}`;
+        
+        // Add a "Remove Comment" button for the comments created by the current user
+        if (comment.username === currentUser) {
+            const removeButton = document.createElement('button');
+            removeButton.textContent = 'Remove Comment';
+            removeButton.addEventListener('click', async () => {
+                await removeComment(comment.id); // Assuming each comment has a unique identifier (e.g., id)
+            });
+            commentElement.appendChild(removeButton);
+        }
+    } else {
+        console.error('Invalid comment data:', comment);
+    }
+
+    return commentElement;
+}
+
+        async function removeComment(commentId) {
+            try {
+                // Call your server-side API to remove the comment based on commentId
+                const response = await fetch(`/comments/${currentPostId}/${commentId}`, {
+                    method: 'DELETE',
+                });
+
+                const { success } = await response.json();
+
+                if (success) {
+                    // Refresh comments after removing a comment
+                    await loadComments();
+                } else {
+                    console.error('Error removing comment');
+                }
+            } catch (error) {
+                console.error('Error removing comment:', error);
+            }
+        }
+
+            loginButton.addEventListener('click', function () {
+                const enteredUsername = usernameInput.value;
+                const enteredPassword = passwordInput.value;
+
+                const user = users.find(u => u.username === enteredUsername && u.password === enteredPassword);
+
+                if (user) {
+                    currentUser = enteredUsername;
+                    alert(`Welcome, ${currentUser}!`);
+                    showPosts();
+                } else {
+                    alert('Invalid username or password. Please try again.');
+                }
+
+                // Clear the form fields
+                usernameInput.value = '';
+                passwordInput.value = '';
+            });
+
+            logoutButton.addEventListener('click', function () {
+                currentUser = null;
+                likedPosts.clear(); // Clear liked posts when logging out
+                hidePosts();
+            });
+
+            likeButtons.forEach((button, index) => {
+                let postId = button.closest('.post').getAttribute('data-post-id');
+
+                button.addEventListener('click', function () {
+                    if (currentUser) {
+                        if (likedPosts.has(postId)) {
+                            likedPosts.delete(postId);
+                            let likeCount = parseInt(likeCounts[index].textContent);
+                            likeCount--;
+                            likeCounts[index].textContent = `${likeCount} ${likeCount === 1 ? 'Like' : 'Likes'}`;
+                        } else {
+                            likedPosts.add(postId);
+                            let likeCount = parseInt(likeCounts[index].textContent);
+                            likeCount++;
+                            likeCounts[index].textContent = `${likeCount} ${likeCount === 1 ? 'Like' : 'Likes'}`;
+                        }
+                    } else {
+                        alert('Please log in to like posts.');
+                    }
+                });
+            });
+
+       
+
+            closeCommentsBtn.addEventListener('click', function () {
+                hideCommentsWindow();
+            });
+
+            function showPosts() {
+                // Hide the login container and show the posts
+                loginContainer.style.display = 'none';
+                postsContainer.style.display = 'block';
+            }
+
+            function hidePosts() {
+                // Show the login container and hide the posts
+                loginContainer.style.display = 'block';
+                postsContainer.style.display = 'none';
+            }
+
+            function showCommentsWindow() {
+                commentsWindow.style.display = 'block';
+            }
+
+            function hideCommentsWindow() {
+                commentsWindow.style.display = 'none';
+                currentPostId = null;
+            }
+        });
+    </script>
+</body>
+</html>
